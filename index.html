@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050b12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JARVIS">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>JARVIS</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#02070c;--panel:#07131cdd;--line:#165064;--cyan:#54eaff;
+  --cyan2:#8df5ff;--text:#dff8ff;--muted:#86a9b4;--danger:#ff7180;
+}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{min-height:100vh;overflow-x:hidden}
+body:before{content:"";position:fixed;inset:0;
+  background:radial-gradient(circle at 50% 18%,#07364a 0,transparent 34%),
+             linear-gradient(180deg,#06131d,#02050a);z-index:-2}
+header{padding:22px 20px 8px;display:flex;justify-content:space-between;align-items:center}
+.brand{font-size:25px;letter-spacing:5px;font-weight:700}
+.status{font-size:11px;letter-spacing:2px;opacity:.8}
+.status.listening{color:var(--cyan2);text-shadow:0 0 12px var(--cyan)}
+.status.speaking{color:#b6ffff;text-shadow:0 0 12px var(--cyan)}
+.status.error{color:var(--danger)}
+main{max-width:720px;margin:auto;padding:10px 18px 70px}
+.core{width:210px;height:210px;margin:28px auto 20px;border:1px solid var(--cyan);
+  border-radius:50%;display:grid;place-items:center;box-shadow:0 0 25px #19c9e8,inset 0 0 35px #0b7890;
+  position:relative;transition:.25s}
+.core:before,.core:after{content:"";position:absolute;border:1px solid #2fdff5;border-radius:50%}
+.core:before{inset:18px}.core:after{inset:42px}
+.arc{width:76px;height:76px;border-radius:50%;border:8px solid var(--cyan2);
+  border-left-color:transparent;border-bottom-color:transparent;transform:rotate(45deg);
+  box-shadow:0 0 18px #5cecff;transition:.25s}
+@keyframes pulse{50%{box-shadow:0 0 45px #19c9e8,inset 0 0 50px #0b7890}}
+.core{animation:pulse 3s infinite}
+.core.listening{transform:scale(1.04);box-shadow:0 0 70px #19c9e8,inset 0 0 60px #0b7890}
+.core.listening .arc{transform:rotate(225deg) scale(1.08)}
+.core.speaking{transform:scale(1.02)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:15px;
+  backdrop-filter:blur(12px);box-shadow:0 12px 45px #0008}
+#messages{height:290px;overflow:auto;display:flex;flex-direction:column;gap:10px;
+  scroll-behavior:smooth;padding-right:2px}
+.msg{padding:11px 13px;border-radius:15px;max-width:86%;line-height:1.4;font-size:15px;
+  word-wrap:break-word}
+.jarvis{align-self:flex-start;background:#0b2530;border:1px solid #14566a}
+.you{align-self:flex-end;background:#12333d;border:1px solid #22798d}
+.inputrow{display:flex;gap:8px;margin-top:12px}
+.inputrow input{min-width:0;flex:1;background:#02080d;border:1px solid #245567;color:#fff;
+  border-radius:14px;padding:13px;font-size:16px;outline:none}
+.inputrow input:focus{border-color:var(--cyan);box-shadow:0 0 0 2px #54eaff22}
+.btn{min-height:48px;border:1px solid #3edff7;background:#08222c;color:#cfffff;
+  border-radius:14px;padding:0 15px;font-weight:700;cursor:pointer;transition:.15s}
+.btn:hover{background:#0b3040}.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+#mic.active{background:#0d4554;box-shadow:0 0 20px #1bd9f455}
+.quick{display:flex;gap:8px;overflow-x:auto;margin-top:12px;padding-bottom:2px}
+.quick button{white-space:nowrap;border:1px solid #1c5363;background:#071923;color:#bceff7;
+  border-radius:12px;padding:9px 12px;cursor:pointer}
+.quick button:hover{border-color:var(--cyan)}
+.hint{display:block;text-align:center;opacity:.55;margin-top:14px;font-size:12px;line-height:1.4}
+@media(max-width:520px){
+  main{padding-left:12px;padding-right:12px}
+  .core{width:185px;height:185px;margin-top:22px}
+  #messages{height:310px}
+  .inputrow{flex-wrap:wrap}
+  .inputrow input{flex-basis:100%}
+  .inputrow .btn{flex:1}
+}
+.install-box{position:fixed;left:14px;right:14px;bottom:14px;z-index:20;background:#071923f5;
+  border:1px solid #2fdff5;border-radius:18px;padding:15px;box-shadow:0 15px 50px #000b;
+  backdrop-filter:blur(16px);display:none}
+.install-box strong{display:block;margin-bottom:6px}.install-box p{margin:6px 0;color:#bceff7;
+  font-size:13px;line-height:1.45}.install-box button{margin-top:8px}
+.app-toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:30;
+  background:#0b2530;border:1px solid #2fdff5;border-radius:12px;padding:10px 14px;
+  box-shadow:0 8px 30px #0008;opacity:0;pointer-events:none;transition:.2s}
+.app-toast.show{opacity:1}
+body.standalone header{padding-top:max(22px,env(safe-area-inset-top))}
+body.standalone main{padding-bottom:max(70px,env(safe-area-inset-bottom))}
+@media(display-mode: standalone){#install{display:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">JARVIS</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button id="install" class="btn" style="min-height:34px;padding:0 10px;font-size:11px;display:none">APP</button>
+    <div class="status" id="status">ONLINE</div>
+  </div>
+</header>
+<div class="install-box" id="installBox">
+  <strong>JARVIS auf dem Home-Bildschirm</strong>
+  <p>Auf dem iPhone: <b>Teilen</b> → <b>Zum Home-Bildschirm</b> → <b>Hinzufügen</b>.</p>
+  <button class="btn" id="closeInstall">Schließen</button>
+</div>
+<div class="app-toast" id="toast"></div>
+<main>
+<div class="core" aria-label="JARVIS"><div class="arc"></div></div>
+<div class="panel">
+<div id="messages"><div class="msg jarvis">Guten Abend. Ich bin JARVIS. Wie kann ich dir helfen?</div></div>
+<div class="inputrow"><input id="input" placeholder="Sprich mit JARVIS..." autocomplete="off"><button class="btn" id="send">SENDEN</button><button class="btn" id="mic">🎙️</button></div>
+<div class="quick"><button data-q="Wie spät ist es?">🕐 Uhrzeit</button><button data-q="Wie geht es dir?">🤖 JARVIS</button><button data-q="Gib mir Motivation">⚡ Motivation</button><button data-q="Torwart Training">⚽ Torwart</button></div>
+<small class="hint">JARVIS läuft lokal im Browser. Text, Mikrofon und Sprachausgabe sind aktiviert. Für echte KI-Antworten braucht die App später eine sichere KI-API-Verbindung.</small>
+</div>
+</main>
+<script>
+const messages=document.getElementById("messages");
+const input=document.getElementById("input");
+const status=document.getElementById("status");
+const sendBtn=document.getElementById("send");
+const micBtn=document.getElementById("mic");
+const core=document.querySelector(".core");
+
+let recognition=null;
+let listening=false;
+
+function add(text,who="jarvis"){
+  const d=document.createElement("div");
+  d.className="msg "+who;
+  d.textContent=text;
+  messages.appendChild(d);
+  messages.scrollTop=messages.scrollHeight;
+}
+
+function setStatus(text,type=""){
+  status.textContent=text;
+  status.className="status "+type;
+  core.classList.toggle("listening",type==="listening");
+  core.classList.toggle("speaking",type==="speaking");
+  micBtn.classList.toggle("active",type==="listening");
+}
+
+function speak(text){
+  if(!("speechSynthesis" in window)){
+    setStatus("ONLINE");
+    return;
+  }
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang="de-DE";
+  u.rate=.95;
+  u.pitch=1;
+  u.onstart=()=>setStatus("SPRICHT…","speaking");
+  u.onend=()=>setStatus("ONLINE");
+  u.onerror=()=>setStatus("ONLINE");
+  speechSynthesis.speak(u);
+}
+
+function answer(q){
+  q=q.toLowerCase().trim();
+  let a;
+
+  if(q.includes("wie spät")||q.includes("uhr")){
+    a="Es ist "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+" Uhr.";
+  }else if(q.includes("motivation")){
+    a="Fokus. Nächste Aktion. Kein Grübeln über den letzten Fehler. Du kannst die nächste Situation beeinflussen.";
+  }else if(q.includes("torwart")||q.includes("1vs1")){
+    a="Torwart-Modus aktiviert. Beim 1 gegen 1: aktiv bleiben, Ball beobachten, nicht vor dem Schuss wegdrehen und nach jeder Aktion sofort neu fokussieren.";
+  }else if(q.includes("wie geht")){
+    a="Alle Systeme laufen. Bereit für deinen nächsten Befehl.";
+  }else if(q.includes("hallo")||q.includes("hey")){
+    a="Hallo. JARVIS ist bereit.";
+  }else if(q.includes("wer bist du")){
+    a="Ich bin JARVIS, dein Browser-Assistent. Aktuell arbeite ich lokal ohne externe KI-Verbindung.";
+  }else{
+    a="Befehl verstanden. Diese lokale Version kennt dafür noch keine eigene Antwort.";
+  }
+
+  add(a);
+  speak(a);
+}
+
+function send(){
+  const q=input.value.trim();
+  if(!q)return;
+
+  add(q,"you");
+  input.value="";
+  sendBtn.disabled=true;
+  setTimeout(()=>{
+    try{ answer(q); }
+    finally{ sendBtn.disabled=false; input.focus(); }
+  },180);
+}
+
+function startMic(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+
+  if(!SR){
+    setStatus("MIKRO NICHT VERFÜGBAR","error");
+    add("Dein Browser unterstützt die Spracherkennung hier nicht. Bitte nutze einen unterstützten Browser und erlaube den Mikrofonzugriff.","jarvis");
+    return;
+  }
+
+  if(listening){
+    recognition.stop();
+    return;
+  }
+
+  recognition=new SR();
+  recognition.lang="de-DE";
+  recognition.interimResults=true;
+  recognition.continuous=false;
+  listening=true;
+
+  recognition.onstart=()=>{
+    setStatus("HÖRT ZU…","listening");
+  };
+
+  recognition.onresult=e=>{
+    let finalText="";
+    let interimText="";
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const text=e.results[i][0].transcript;
+      if(e.results[i].isFinal) finalText+=text;
+      else interimText+=text;
+    }
+    input.value=finalText||interimText;
+    if(finalText.trim()) send();
+  };
+
+  recognition.onerror=e=>{
+    const messages={
+      "not-allowed":"Mikrofonzugriff wurde verweigert. Erlaube deinem Browser den Mikrofonzugriff.",
+      "audio-capture":"Es wurde kein funktionierendes Mikrofon gefunden.",
+      "no-speech":"Ich habe nichts gehört. Versuch es bitte noch einmal.",
+      "network":"Die Spracherkennung konnte keine Verbindung herstellen."
+    };
+    setStatus("ONLINE");
+    add(messages[e.error]||"Die Spracherkennung ist fehlgeschlagen. Bitte versuche es erneut.","jarvis");
+  };
+
+  recognition.onend=()=>{
+    listening=false;
+    setStatus("ONLINE");
+  };
+
+  try{
+    recognition.start();
+  }catch(err){
+    listening=false;
+    setStatus("ONLINE");
+    add("Das Mikrofon konnte nicht gestartet werden. Bitte versuche es erneut.","jarvis");
+  }
+}
+
+sendBtn.addEventListener("click",send);
+input.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    e.preventDefault();
+    send();
+  }
+});
+micBtn.addEventListener("click",startMic);
+
+document.querySelectorAll(".quick button").forEach(b=>{
+  b.addEventListener("click",()=>{
+    input.value=b.dataset.q;
+    send();
+  });
+});
+
+// Stop speech when the user closes/leaves the page.
+window.addEventListener("pagehide",()=>{
+  if("speechSynthesis" in window) speechSynthesis.cancel();
+});
+
+// App/PWA helpers
+const installBtn=document.getElementById("install");
+const installBox=document.getElementById("installBox");
+const closeInstall=document.getElementById("closeInstall");
+const toast=document.getElementById("toast");
+
+function toastMsg(t){
+  toast.textContent=t;
+  toast.classList.add("show");
+  setTimeout(()=>toast.classList.remove("show"),2200);
+}
+
+function isStandalone(){
+  return window.matchMedia("(display-mode: standalone)").matches ||
+         window.navigator.standalone === true;
+}
+if(isStandalone()) document.body.classList.add("standalone");
+
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  installBtn.style.display="block";
+});
+installBtn.addEventListener("click",async()=>{
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt=null;
+    installBtn.style.display="none";
+  }else{
+    installBox.style.display="block";
+  }
+});
+closeInstall.addEventListener("click",()=>installBox.style.display="none");
+
+if("serviceWorker" in navigator && location.protocol!=="file:"){
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("./sw.js").catch(()=>{});
+  });
+}
+
+// Keep chat after reopening the app.
+try{
+  const saved=JSON.parse(localStorage.getItem("jarvis-chat")||"[]");
+  saved.forEach(m=>add(m.text,m.who));
+  if(saved.length) messages.scrollTop=messages.scrollHeight;
+}catch(_){}
+
+const originalAdd=add;
+add=function(text,who="jarvis"){
+  originalAdd(text,who);
+  try{
+    const items=JSON.parse(localStorage.getItem("jarvis-chat")||"[]");
+    items.push({text,who});
+    localStorage.setItem("jarvis-chat",JSON.stringify(items.slice(-60)));
+  }catch(_){}
+};
+
+// Prevent duplicate greeting after restoring history.
+if(messages.children.length>1){
+  const first=messages.firstElementChild;
+  if(first && first.classList.contains("jarvis") &&
+     first.textContent==="Guten Abend. Ich bin JARVIS. Wie kann ich dir helfen?"){
+    first.remove();
+  }
+}
+
+</script>
+</body></html>
